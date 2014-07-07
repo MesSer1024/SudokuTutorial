@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 //---------------- Thonky -------------
+//http://www.thonky.com/sudoku/
 //Singles (rows, columns, blocks)
 //Naked (pairs, tripels, quads)
 //Hidden (pairs, triples, quads)
@@ -87,7 +88,7 @@ namespace SudokuTutorial.Techniques
     public class SudokuNode
     {
         private int _boardValue;
-        private List<int> _candidates;
+        private List<int> _candidates = new List<int>();
         private int _id;
         public int ID { get { return _id; } }
 
@@ -124,7 +125,7 @@ namespace SudokuTutorial.Techniques
 
         public bool isKnown()
         {
-            return Value != 0 || (_candidates != null && _candidates.Count == 1);
+            return Value != 0 || ( _candidates.Count == 1);
         }
 
         public int Row { get { return _id / 9; } }
@@ -263,23 +264,227 @@ namespace SudokuTutorial.Techniques
         /// </summary>
         /// <param name="board"></param>
         /// <param name="unknowns"></param>
-        public static void removeBasicCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        public static bool removeBasicCandidates(SudokuBoard board, List<SudokuNode> unknowns)
         {
-            var handledThisTurn = new Dictionary<int, bool>();
+            var handledThisTurn = new Dictionary<int, int>();
+            bool needAnotherTechnique = true;
             foreach (var node in unknowns)
             {
                 if (!handledThisTurn.ContainsKey(node.ID) && !node.isKnown())
                 {
-                    handledThisTurn.Add(node.ID, true);
+                    handledThisTurn.Add(node.ID, 0);
                     var neighbours = board.getNeighbours(node.ID);
                     foreach (var neighbour in neighbours)
                     {
                         if (neighbour.isKnown())
                             node.removeCandidate(neighbour.Value);
                     }
-                    
+                    if (node.getCandidates().Length == 1)
+                        needAnotherTechnique = false;
                 }
             }
+            return needAnotherTechnique;
+        }
+
+        public static bool removeNakedCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        {
+            bool needAnotherTechnique = true;
+            foreach (var node in unknowns)
+            {
+                //check rows
+                {
+                    var rowNeighbours = board.getNodesByRow(node.Row);
+                    if (removeNakedPair(rowNeighbours))
+                        needAnotherTechnique = false;
+                }
+
+                //check cols
+                {
+                    var colNeighbours = board.getNodesByColumn(node.Col);
+                    if (removeNakedPair(colNeighbours))
+                        needAnotherTechnique = false;
+                }
+
+                //check blocks
+                {
+                    var blockNeighbours = board.getNodesByBlock(node.Block);
+                    if (removeNakedPair(blockNeighbours))
+                        needAnotherTechnique = false;
+                }
+
+                //end of iteration
+                if (node.getCandidates().Length == 1)
+                    needAnotherTechnique = false;
+            }
+
+            return needAnotherTechnique;
+        }
+
+        private static bool removeNakedPair(List<SudokuNode> neighbours)
+        {
+            bool progress = false;
+            //find nodes that have 2 candidates
+            var potentialMatches = neighbours.FindAll(a => { return a.getCandidates().Length == 2; });
+
+            //check candidates to see if they are a true match (exactly two items using same two values)
+            if (potentialMatches.Count > 1)
+            {
+                var checkedCombos = new List<string>();
+                for (int i = 0; i < potentialMatches.Count; ++i)
+                {
+                    List<SudokuNode> exactMatches = new List<SudokuNode>();
+                    exactMatches.Add(potentialMatches[i]);
+                    var c = potentialMatches[i].getCandidates();
+                    if (c.Length != 2)
+                        continue; //item has been changed due to previous iterations of algorithm
+                    int aVal = c[0];
+                    int bVal = c[1];
+                    string id = aVal.ToString() + bVal.ToString();
+                    if (!checkedCombos.Contains(id))
+                    {
+                        checkedCombos.Add(id);
+                        //check candidates against all other potential matches
+                        for (int j = i + 1; j < potentialMatches.Count; ++j)
+                        {
+                            c = potentialMatches[j].getCandidates();
+                            if (c.Length != 2)
+                                continue; //item has been changed due to previous iterations of algorithm
+                            if (aVal == c[0] && bVal == c[1])
+                            {
+                                exactMatches.Add(potentialMatches[j]);
+                            }
+                        }
+
+                        if (exactMatches.Count == 2)
+                        {
+                            //we know that these candidates can only exist on these two nodes, and can hence remove these candidates from all other nodes in this row
+                            var diff = neighbours.Except(exactMatches);
+                            foreach (var item in diff)
+                            {
+                                if (!item.isKnown())
+                                {
+                                    item.removeCandidate(aVal);
+                                    item.removeCandidate(bVal);
+                                    progress = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return progress;
+        }
+
+        public static bool removeHiddenCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        {
+            bool needAnotherTechnique = true;
+            foreach (var node in unknowns)
+            {
+                bool progress = false;
+                //check rows
+                {
+                    //if row contains exactly 2 nodes that have candidates that can only be found in these 2 nodes...
+                    var rowNeighbours = board.getNodesByRow(node.Row);
+                    if (findHidden(rowNeighbours))
+                        progress = true;
+                }
+
+                //check cols
+                {
+                    var colNeighbours = board.getNodesByColumn(node.Col);
+                    if (findHidden(colNeighbours))
+                        progress = true;
+                }
+
+                //check blocks
+                {
+                    var blockNeighbours = board.getNodesByBlock(node.Block);
+                    if (findHidden(blockNeighbours))
+                        progress = true;
+                }
+
+                //end of iteration
+                if (progress || node.getCandidates().Length == 1)
+                    needAnotherTechnique = false;
+            }
+
+            return needAnotherTechnique;
+        }
+
+        private static bool findHidden(List<SudokuNode> neighbours)
+        {
+            bool success = false;
+            var potentialValues = new Dictionary<int, List<SudokuNode>>();
+            for (int i = 0; i < 9; ++i)
+                potentialValues.Add(i + 1, new List<SudokuNode>());
+            foreach (var node in neighbours)
+            {
+                foreach (var c in node.getCandidates())
+                    potentialValues[c].Add(node);
+            }
+
+            //if a number only has 2 nodes ... and another number only has 2 nodes, and those numbers share the same nodes...
+            var foo = potentialValues.Where(a => a.Value.Count == 2);
+            int n= foo.Count();
+            if (n > 1)
+            {
+                for (int i = 0; i < n; ++i)
+                {
+                    bool iterationSuccess = false;
+                    var ele = foo.ElementAt(i);
+                    SudokuNode aNode = ele.Value[0];
+                    SudokuNode bNode = ele.Value[1];
+                    int pairedNum = 0;
+                    for (int j = i + 1; j < n; ++j)
+                    {
+                        var pair = foo.ElementAt(j);
+                        if (pair.Value.Contains(aNode) && pair.Value.Contains(bNode))
+                        {
+                            if(pairedNum == 0)
+                                pairedNum = pair.Key;
+                            else {
+                                //more than 2 items...
+                                pairedNum = 0;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (pairedNum > 0)
+                    {
+                        int aVal = pairedNum;
+                        int bVal = ele.Key;
+                        int aCandsStart = aNode.getCandidates().Length;
+                        int bCandsStart = bNode.getCandidates().Length;
+                        var cands = aNode.getCandidates();
+                        foreach (var c in cands)
+                        {
+                            if (c != aVal && c != bVal)
+                            {
+                                aNode.removeCandidate(c);
+                                iterationSuccess = true;
+                            }
+                        }
+                        cands = bNode.getCandidates();
+                        foreach (var c in cands)
+                        {
+                            if (c != aVal && c != bVal)
+                            {
+                                bNode.removeCandidate(c);
+                                iterationSuccess = true;
+                            }
+                        }
+
+                        if (iterationSuccess)
+                        {
+                            success = true;
+                            Console.WriteLine("Using removeHidden, we successfully reduced candidates for {0} from originally {1} candidates", aNode, aCandsStart);
+                            Console.WriteLine("Using removeHidden, we successfully reduced candidates for {0} from originally {1} candidates", bNode, bCandsStart);
+                        }
+                    }
+                }
+            }
+            return success;
         }
     }
 }
