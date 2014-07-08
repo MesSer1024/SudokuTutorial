@@ -19,31 +19,65 @@ namespace SudokuPrinter
 
             //advanced (not naked)
             //var board = SudokuLib.generateBoard("31....2..9..7....3.....9.6....8........9.28...7.6.5.2.....2.5...5....1.4.64......");
+            //var board = SudokuLib.generateBoard("1.........5....1.2..25.74....5.38.1......467.7....5..9.9.....8.......9...734.....");
 
             //advanced
             //var board = SudokuLib.generateBoard(".....1.68..4.26.3.286.7....84..1...66..7..........4...51......7....5.9..769...8.2");
-            //var board = SudokuLib.generateBoard("..219.4....5....3.......6.5..19...87.2...6...5.8........6......41.6.7..97..8...2.");
-            //var board = SudokuLib.generateBoard("..93.7.....142.87..7.......3...6......791..2......2..5..2....5......16.4..8.....9");
             //var board = SudokuLib.generateBoard("3.8.2..7.....31....4......8.....8.57..3..61..5.....2.675...9............4..75..9.");
             //var board = SudokuLib.generateBoard("....65...1...9.5...7.28...1..7.14..64.9...32..5..........63.4.....8.....2....1.7.");
-            var board = SudokuLib.generateBoard("1.........5....1.2..25.74....5.38.1......467.7....5..9.9.....8.......9...734.....");
-            
+
+            //hard (simple colouring required)
+            var board = SudokuLib.generateBoard("..93.7.....142.87..7.......3...6......791..2......2..5..2....5......16.4..8.....9");
+
+
+            //foo
+            //var board = SudokuLib.generateBoard("..219.4....5....3.......6.5..19...87.2...6...5.8........6......41.6.7..97..8...2.");
+
             printValues(board);
 
             bool iterate = true;
             var unknowns = new List<SudokuNode>();
+            bool forceIteration = false;
             while (iterate)
             {
                 int level = 0;
-                //reset state
-                unknowns.Clear();
-                Techniques.fillUnknowns(board, unknowns);
-
+                if (forceIteration)
+                {
+                    forceIteration = false;
+                }
+                else
+                {
+                    //reset state
+                    unknowns.Clear();
+                    Techniques.fillUnknowns(board, unknowns);
+                }
                 //remove candidates
                 if (++level > 0 && Techniques.removeBasicCandidates(board, unknowns))
-                    if (++level > 0 && Techniques.removeNakedCandidates(board, unknowns) && ++level > 0)
-                        if (++level > 0 && Techniques.removeHiddenCandidates(board, unknowns) && ++level > 0)
-                    {}
+                {
+                    if (++level > 0 && Techniques.removeHiddenBasic(board, unknowns))
+                    {
+                        if (++level > 0 && Techniques.removeNakedCandidates(board, unknowns))
+                        {
+                            if (++level > 0 && Techniques.removeHiddenCandidates(board, unknowns))
+                            {
+                                if (++level > 0 && Techniques.removeSimpleColoringCandidates(board, unknowns))
+                                {
+                                }
+                            }
+                            else
+                            {
+                                ////removed hidden is often combined with removeNakedCandidates since removeHidden ends up with items having 2 candidates 
+                                ////which is what removeNaked is looking for, thus if remove hidden is successful (returns false) we should act on it and run another pass of removeNaked
+                                //Techniques.removeNakedCandidates(board, unknowns);
+                                forceIteration = true;
+                            }
+                        }
+                        else
+                        {
+                            forceIteration = true;
+                        }
+                    }
+                }
 
                 //handle iteration
                 var items = SudokuUtils.getItemsWithOneCandidate(unknowns);
@@ -59,8 +93,13 @@ namespace SudokuPrinter
                     printValues(board);
                 }
                 else
-                {
+                {   
                     iterate = false;
+                    if (forceIteration)
+                    {
+                        iterate = true;
+                        Console.WriteLine("Forcing another iteration due to candidates being removed");
+                    }
                 }
             }
 

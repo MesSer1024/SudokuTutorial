@@ -25,45 +25,49 @@ using System.Threading.Tasks;
 //xyz-wing
 
 //---------------- Sudoku Solver -------------
-//hidden singles
-//naked pairs/triples
-//hidden pairs/triples
-//naked quads
-//pointing pairs
-//box/line reduction
+//Check for solved cells
+//Show Possibles	No
 
-//x-wing
-//Simple Colouring
-//Y-wing
-//swordfish
-//xyz-wing
-
-//X-cycles
-//XY-chain
-//3d medusa
-//jelly-fish
-//unique rectangles
-//extended unique rectangles
-//hidden unique rectangles
-//wxyz wing
-//aligned pair exclusion
-
-//grouped x-cycles
-//empty rectangles
-//finned x-wing
-//finned sword-fish
-//altern. inference chains
-//sue-de-coq
-//digit forcing chains
-//nishio forcing chains
-//cell forcing chains
-//unit forcing chains
-//almost locked sets
-//death blossom
-//pattern overlay method
-//quad forcing chains
-
-//bowman's bingo
+//1: Hidden Singles	
+//2: Naked Pairs/Triples	
+//3: Hidden Pairs/Triples	 
+//4: Naked Quads	 
+//5: Pointing Pairs	 
+//6: Box/Line Reduction
+	 
+//Tough Strategies	
+//    7: X-Wing	 
+//    8: Simple Colouring	 
+//    9: Y-Wing	 
+//    10: Sword-Fish	 
+//    11: XYZ Wing	 
+//Diabolical Strategies	
+//    12: X-Cycles	 
+//    13: XY-Chain	 
+//    14: 3D Medusa	 
+//    15: Jelly-Fish	 
+//    16: Unique Rectangles	 
+//    17: Extended Unique Rect.	 
+//    18: Hidden Unique Rect's	 
+//    19: WXYZ Wing	 
+//    20: Aligned Pair Exclusion	 
+//Extreme Strategies	
+//    21: Grouped X-Cycles	 
+//    22: Empty Rectangles	 
+//    23: Finned X-Wing	 
+//    24: Finned Sword-Fish	 
+//    25: Altern. Inference Chains	 
+//    26: Sue-de-Coq	 
+//    27: Digit Forcing Chains	 
+//    28: Nishio Forcing Chains	 
+//    29: Cell Forcing Chains	 
+//    30: Unit Forcing Chains	 
+//    31: Almost Locked Sets	 
+//    32: Death Blossom	 
+//    33: Pattern Overlay Method	 
+//    34: Quad Forcing Chains	 
+//"Trial and Error"	
+//    35: Bowman's Bingo
 
 namespace SudokuTutorial.Techniques
 {
@@ -363,9 +367,11 @@ namespace SudokuTutorial.Techniques
                             {
                                 if (!item.isKnown())
                                 {
+                                    var orgCount = item.getCandidates().Length;
                                     item.removeCandidate(aVal);
                                     item.removeCandidate(bVal);
-                                    progress = true;
+                                    if (orgCount != item.getCandidates().Length)
+                                        progress = true;
                                 }
                             }
                         }
@@ -373,6 +379,79 @@ namespace SudokuTutorial.Techniques
                 }
             }
             return progress;
+        }
+
+        public static bool removeHiddenBasic(SudokuBoard board, List<SudokuNode> unknowns)
+        {
+            bool needAnotherTechnique = true;
+            foreach (var node in unknowns)
+            {
+                bool progress = false;
+                //check rows
+                {
+                    var rowNeighbours = board.getNodesByRow(node.Row);
+                    if (findHiddenBasic(rowNeighbours))
+                        progress = true;
+                }
+
+                //check cols
+                {
+                    var colNeighbours = board.getNodesByColumn(node.Col);
+                    if (findHiddenBasic(colNeighbours))
+                        progress = true;
+                }
+
+                //check blocks
+                {
+                    var blockNeighbours = board.getNodesByBlock(node.Block);
+                    if (findHiddenBasic(blockNeighbours))
+                        progress = true;
+                }
+
+                //end of iteration
+                if (progress || node.getCandidates().Length == 1)
+                    needAnotherTechnique = false;
+            }
+            return needAnotherTechnique;
+        }
+
+        public static bool findHiddenBasic(List<SudokuNode> neighbours)
+        {
+            bool success = false;
+            var potentialValues = new Dictionary<int, List<SudokuNode>>();
+            for (int i = 0; i < 9; ++i)
+                potentialValues.Add(i + 1, new List<SudokuNode>());
+            foreach (var node in neighbours)
+            {
+                foreach (var c in node.getCandidates())
+                    potentialValues[c].Add(node);
+            }
+
+            //if a number is only referenced by 1 node, that node has to be that number
+            var foo = potentialValues.Where(a => a.Value.Count == 1);
+            int n = foo.Count();
+            if (n > 0)
+            {
+                for (int i = 0; i < n; ++i)
+                {
+                    var ele = foo.ElementAt(i);
+                    if (ele.Value.Count > 1)
+                        throw new Exception("Foobar!");
+                    var node = ele.Value[0];
+                    var cand = node.getCandidates();
+                    var orgCount = node.getCandidates().Length;
+                    foreach (var c in cand)
+                    {
+                        if (c != ele.Key)
+                        {
+                            node.removeCandidate(c);
+                        }
+                    }
+                    if (orgCount != node.getCandidates().Length)
+                        success = true;
+                }
+            }
+            return success;
         }
 
         public static bool removeHiddenCandidates(SudokuBoard board, List<SudokuNode> unknowns)
@@ -407,7 +486,6 @@ namespace SudokuTutorial.Techniques
                 if (progress || node.getCandidates().Length == 1)
                     needAnotherTechnique = false;
             }
-
             return needAnotherTechnique;
         }
 
@@ -485,6 +563,109 @@ namespace SudokuTutorial.Techniques
                 }
             }
             return success;
+        }
+
+        public static bool removeSimpleColoringCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        {
+            for (int candidate = 0; candidate < 9; ++candidate)
+            {
+                foreach (var startNode in unknowns)
+                {
+                    //Single Chains
+                    //desc: remove candidates due to building a hierarchy tree between nodes that share the same candidate
+                    // for every depth traversal, you change between toggling node as "on" or "off"
+                    // finding start point:
+                    //  need to find a node that have a candidate that is shared between EXACTLY two nodes inside a [row/col/block] 
+                    // that means it can be shared both due to block, or due to row, but not more than 2 items for each type
+
+                    if (startNode.getCandidates().Contains(candidate))
+                    {
+                        var openNodes = new List<SudokuNode>();
+                        var neighbours = board.getNeighbours(startNode.ID);
+                        var sharedCandidates = neighbours.FindAll(a => a != startNode && a.getCandidates().Contains(candidate));
+                        var rowMatches = sharedCandidates.FindAll(a => a.Row == startNode.Row);
+                        var colMatches = sharedCandidates.FindAll(a => a.Col == startNode.Col);
+                        var blockMatches = sharedCandidates.FindAll(a => a.Block == startNode.Block);
+
+                        //if there only are two items in a row/col/block we can start counting from this item...
+                        if (rowMatches.Count == 1 || colMatches.Count == 1 || blockMatches.Count == 1)
+                        {
+                            var statusDecorator = new Dictionary<SudokuNode, bool>();
+
+                            if (rowMatches.Count == 1)
+                                openNodes.AddRange(rowMatches);
+                            if (colMatches.Count == 1)
+                                openNodes.AddRange(colMatches);
+                            if (blockMatches.Count == 1)
+                                openNodes.AddRange(blockMatches);
+
+                            statusDecorator.Add(startNode, true);
+                            foreach(var n in sharedCandidates) {
+                                if(!statusDecorator.ContainsKey(n)) {
+                                    statusDecorator.Add(n, !statusDecorator[startNode]);
+                                }
+                            }
+
+                            while (openNodes.Count > 0)
+                            {
+                                var currNode = openNodes[0];
+                                openNodes.RemoveAt(0);
+                                if (statusDecorator.ContainsKey(currNode))
+                                    continue;
+
+                                neighbours = board.getNeighbours(currNode.ID);
+                                sharedCandidates = neighbours.FindAll(a => a != currNode && a.getCandidates().Contains(candidate));
+                                rowMatches = sharedCandidates.FindAll(a => a.Row == currNode.Row);
+                                colMatches = sharedCandidates.FindAll(a => a.Col == currNode.Col);
+                                blockMatches = sharedCandidates.FindAll(a => a.Block == currNode.Block);
+
+                                if (rowMatches.Count == 1)
+                                    openNodes.Add(rowMatches[0]);
+                                if (colMatches.Count == 1)
+                                    openNodes.AddRange(colMatches);
+                                if (blockMatches.Count == 1)
+                                    openNodes.AddRange(blockMatches);
+
+                                foreach (var n in sharedCandidates)
+                                {
+                                    if (!statusDecorator.ContainsKey(n))
+                                        statusDecorator.Add(n, !statusDecorator[currNode]);
+                                }
+                            }
+
+                            //all items have been searched for this value...
+                            //verify the items that we traversed and see if we have two items in same "block/col/row" where they are "on" or "off"
+                            foreach (var pair in statusDecorator)
+                            {
+                                bool itemStatus = statusDecorator[pair.Key];
+                                var checks = board.getNeighbours(pair.Key.ID);
+                                var foobars = new List<SudokuNode>();
+                                foobars.Add(pair.Key);
+                                checks.ForEach((a) =>
+                                {
+                                    if (statusDecorator.ContainsKey(a) && statusDecorator[a] == itemStatus)
+                                    {
+                                        foobars.Add(a);
+                                    }
+                                });
+
+                                if (foobars.Count > 1)
+                                {
+                                    //foreach (var p in statusDecorator)
+                                    //{
+                                    //    if (p.Value == itemStatus)
+                                    //    {
+                                    //        p.Key.removeCandidate(candidate);
+                                    //    }
+                                    //}
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return true;
         }
     }
 }
