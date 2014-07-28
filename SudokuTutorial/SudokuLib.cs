@@ -9,14 +9,12 @@ namespace SudokuTutorial
 {
     public class SudokuLib
     {
-        public static SudokuBoard generateBoard()
-        {
-            return new SudokuBoard();
-        }
 
         public static SudokuBoard generateBoard(string input)
         {
-            var board = new SudokuBoard();
+            if (input.Length != 81)
+                throw new Exception("Invalid board size!");
+            var board = new SudokuBoard(input);
             var nodes = board.getNodes();
             for (int i = 0; i < input.Length; ++i)
             {

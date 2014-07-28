@@ -1,0 +1,41 @@
+- Track Changes for a specific cell/node (track changes to candidate & value)
+2:3	11
+3:6	23
+
+
+458
+58
+45
+
+458
+459
+49
+
+458
+58
+459
+
+578
+179
+78
+
+578
+58
+189
+78
+--Valid 013
+
+[0]	{ID=[48], Row: 6, Col: 4, Candidate(s)=78}	SudokuTutorial.Techniques.SudokuNode
+[1]	{ID=[49], Row: 6, Col: 5, Candidate(s)=3478}	SudokuTutorial.Techniques.SudokuNode
+[2]	{ID=[51], Row: 6, Col: 7, Candidate(s)=134789}	SudokuTutorial.Techniques.SudokuNode
+
+
+- Total references to value
+- Pigeon hole principle (?)
+- Numret kan bara finnas på ett ställe / unit
+- Alla ställen måste ha ett nummer
+- Om en nod har x kandidater och 
+
+Om en nod har x kandidater
+	för varje kandidat, kolla hur många noder som referar till den inom unit
+		om antalet noder som referar till kandidaten är < x
