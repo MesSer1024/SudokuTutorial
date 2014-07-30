@@ -254,6 +254,11 @@ namespace SudokuTutorial.Techniques
             neighbours.RemoveAll(a => a.ID == id);
             return neighbours;
         }
+
+        public override string ToString()
+        {
+            return this.OriginalInput;
+        }
     }
 
     public class SudokuResponse 
