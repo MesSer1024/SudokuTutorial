@@ -829,7 +829,7 @@ namespace SudokuTutorial.Techniques
                             {
                                 for (int l = k + 1; l < nodes.Count; ++l)
                                 {
-                                    var candidates = Combine(nodes[i].getCandidates(), nodes[j].getCandidates(), nodes[k].getCandidates(), nodes[l].getCandidates()).Distinct();
+                                    var candidates = combineCandidates(nodes[i], nodes[j], nodes[k], nodes[l]).Distinct();
 
                                     if (candidates.Count() <= depth)
                                     {
@@ -861,9 +861,19 @@ namespace SudokuTutorial.Techniques
             return needAnotherTechnique;
         }
 
-        public static IEnumerable<T> Combine<T>(params ICollection<T>[] toCombine)
+        public static IEnumerable<T> combine<T>(params ICollection<T>[] toCombine)
         {
             return toCombine.SelectMany(x => x);
+        }
+
+        private static List<int> combineCandidates(params SudokuNode[] nodes)
+        {
+            List<int> foo = new List<int>();
+            foreach (var node in nodes)
+            {
+                foo.AddRange(node.getCandidates());
+            }
+            return foo;
         }
 
         public static bool removePointingPairs(SudokuBoard board, List<SudokuNode> unknowns)

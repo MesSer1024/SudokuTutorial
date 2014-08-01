@@ -39,7 +39,7 @@ namespace SudokuPrinter
             //boards.Add(".3...8.....7.13.8..6.5..314......95.6.....273.72......291..5.3..4.39.5.....7...6.");
 
             //pointing pairs required
-            boards.Add("5..683....8..7......6.2..7....2.5....9.7..35.81.........9......43....1........82.");
+            //boards.Add("5..683....8..7......6.2..7....2.5....9.7..35.81.........9......43....1........82.");
 
             //hard
             //boards.Add("..93.7.....142.87..7.......3...6......791..2......2..5..2....5......16.4..8.....9"); //Simple Colouring
@@ -63,7 +63,11 @@ namespace SudokuPrinter
             //boards.Add(".2.58..3.35.....84.867...2..48.9.1565..6.8.4.963.5.278.9..6581.6..8...9283.....6."); //(Hidden Unique Rectangle - type 2b)
             //boards.Add("5184726393.6859..44.9316...94562.3..861.34..5732.85..665..9.8.3293.48.6118..63..."); //(Hidden Unique Rectangle - type 2b - awesome example)
 
+            boards.Add("....3..86....2..4..9..7852.3718562949..1423754..3976182..7.3859.392.54677..9.4132"); //Naked Triple/Quads
+
+            //---special boards---
             //appendTop95Boards(boards);
+
 
 
             foreach (var b in boards)
@@ -79,7 +83,7 @@ namespace SudokuPrinter
                 techniques.Add(() => { if (!Techniques.removeBasicCandidates(board, unknowns)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeHiddenBasic(board, unknowns)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns)) forceIteration = true; });
-                //techniques.Add(() => { if (!Techniques.removeNakedManyCandidates(board, unknowns)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeNakedManyCandidates(board, unknowns, 4)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeHiddenCandidates(board, unknowns)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removePointingPairs(board, unknowns)) forceIteration = true; });
                 //techniques.Add(() => { if (!Techniques.removeCubeCandidates(board, unknowns)) forceIteration = true; });
