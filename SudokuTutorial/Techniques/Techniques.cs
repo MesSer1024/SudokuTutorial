@@ -88,6 +88,19 @@ namespace SudokuTutorial.Techniques
             }
             return items;
         }
+
+        public static object populateCandidateMap(List<SudokuNode> nodes)
+        {
+            var map = new Dictionary<int, List<SudokuNode>>();
+            for(int i=0; i < 9; ++i) {
+                map.Add(i+1, new List<SudokuNode>());
+            }
+            foreach (var n in nodes)
+            {
+                n.getCandidates().ToList().ForEach(candidate => map[candidate].Add(n));
+            }
+            return map;
+        }
     }
 
     public class SudokuNode
@@ -159,7 +172,7 @@ namespace SudokuTutorial.Techniques
         {
             if (isKnown())
             {
-                return string.Format("ID=[{3}], Row: {0}, Col: {1}, Value={2}", Row + 1, Col + 1, Value, ID);
+                return string.Format("ID=[{3}], Row: {0}, Col: {1}, Block: {3}, Value={2}", Row + 1, Col + 1, Value, ID, Block + 1);
             }
             else
             {
@@ -168,7 +181,7 @@ namespace SudokuTutorial.Techniques
                 {
                     sb.Append(c);
                 }
-                return string.Format("ID=[{3}], Row: {0}, Col: {1}, Candidate(s)={2}", Row + 1, Col + 1, sb.ToString(), ID);
+                return string.Format("ID=[{3}], Row: {0}, Col: {1}, Block: {4}, Candidate(s)={2}", Row + 1, Col + 1, sb.ToString(), ID, Block + 1);
             }
         }
     }
@@ -797,69 +810,60 @@ namespace SudokuTutorial.Techniques
             return true;
         }
 
-        public static bool removeNakedManyCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        public static bool removeNakedManyCandidates(SudokuBoard board, List<SudokuNode> unknowns, int depth)
         {
+            //basically we base this solution against subsets, can the subset of candidates from x different nodes fit in 4 nodes?
             bool needAnotherTechnique = true;
-            int treshold = 2;
 
-            for (int row = 0; row < 9; ++row)
+            foreach (var baseNode in unknowns)
             {
-                var potentialsOnRow = unknowns.FindAll(a => a.Row == row && a.getCandidates().Length <= treshold);
-                if (potentialsOnRow.Count >= treshold)
+                //block
                 {
-                    var matches = new List<SudokuNode>();
-                    foreach (var foo in potentialsOnRow)
+                    //find nodes where number of candidates are in range
+                    var nodes = board.getNodesByBlock(baseNode.Block).FindAll( a => a.getCandidates().Length >= 2 && a.getCandidates().Length <= depth);
+                    for(int i=0; i < nodes.Count; ++i)
                     {
-                        foreach (var bar in potentialsOnRow)
+                        for (int j = i + 1; j < nodes.Count; ++j)
                         {
-                            if (foo != bar)
+                            for (int k = j + 1; k < nodes.Count; ++k)
                             {
-                                var area = foo.getCandidates().Intersect(bar.getCandidates());
-                                if (area.Count() == bar.getCandidates().Length)
+                                for (int l = k + 1; l < nodes.Count; ++l)
                                 {
-                                    matches.Add(foo);
-                                    matches.Add(bar);
+                                    var candidates = Combine(nodes[i].getCandidates(), nodes[j].getCandidates(), nodes[k].getCandidates(), nodes[l].getCandidates()).Distinct();
+
+                                    if (candidates.Count() <= depth)
+                                    {
+                                        //the entire subset of candidates from all nodes can fit inside x nodes
+                                        var closedSet = new List<SudokuNode>() { nodes[i], nodes[j], nodes[k], nodes[l] };
+                                        var otherBlockNodes = board.getNodesByBlock(baseNode.Block).Except(closedSet);
+
+                                        foreach (var node in otherBlockNodes)
+                                        {
+                                            var oldSet = node.getCandidates();
+                                            var newSet = oldSet.Except(candidates).ToArray();
+                                            if (oldSet.Length > newSet.Length)
+                                            {
+                                                node.setCandidates(newSet);
+                                                needAnotherTechnique = false;
+                                            }
+                                        }
+                                        //break if something was changed
+                                        if (needAnotherTechnique == false)
+                                            return needAnotherTechnique;
+                                    }
                                 }
                             }
-                        }
-                    }
-                    matches = matches.Distinct().ToList();
-                    if (matches.Count == treshold)
-                    {
-                        var candidates = new List<int>();
-                        matches.ForEach(a =>
-                        {
-                            candidates.AddRange(a.getCandidates());
-                        });
-                        candidates = candidates.Distinct().ToList();
-                        var foo = board.getNodesByRow(row).FindAll(a => a.isKnown() == false).Except(matches);
-                        foreach (var f in foo)
-                        {
-                            candidates.ForEach(a => f.removeCandidate(a));
-                            if (f.getCandidates().Length <= 1)
-                                treshold = 2;
                         }
                     }
                 }
             }
 
-            //find out where all number could potentially be placed
-            //var valuesTable = new Dictionary<int, List<SudokuNode>>();
-            //for (int i = 0; i < 9; ++i)
-            //{
-            //    int key = i + 1;
-            //    valuesTable.Add(key, unknowns.FindAll(a => a.getCandidates().Contains(key)));
-            //}
-
-            //var potentialUnknownMatches = unknowns.FindAll(a => a.getCandidates().Length == 2);
-            //foreach (var foo in potentialUnknownMatches)
-            //{
-            //    var bar = valuesTable[foo.getCandidates()[0]];
-            //    var rowMatches = bar.FindAll(a => a.Row == foo.Row);
-            //}
-
-
             return needAnotherTechnique;
+        }
+
+        public static IEnumerable<T> Combine<T>(params ICollection<T>[] toCombine)
+        {
+            return toCombine.SelectMany(x => x);
         }
 
         public static bool removePointingPairs(SudokuBoard board, List<SudokuNode> unknowns)
