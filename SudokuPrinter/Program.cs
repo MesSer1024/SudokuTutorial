@@ -41,6 +41,15 @@ namespace SudokuPrinter
             //pointing pairs required
             boards.Add("5..683....8..7......6.2..7....2.5....9.7..35.81.........9......43....1........82.");
 
+            //Example Boards
+            boards.Add(".....1.3.231.9.....65..31..6789243..1.3.5...6...1367....936.57...6.198433........"); //Hidden triples
+            boards.Add("....3..86....2..4..9..7852.3718562949..1423754..3976182..7.3859.392.54677..9.4132"); //Naked Triple/Quads
+            //boards.Add("42.9..386.6.2..7948.9.6.2517....3.259..1.26.32..5....8..4.2.5676827..439......812"); //Unique Rectangle | Also good because solver at sudokuwiki.org uses unneccessary techniques such as simple colouring & X-cycle which removes candidates but is unneccessary for solution
+            //boards.Add("1.957.3...7.39..1...3.1.597.8.743...492.5.78373.289.4.317.2.4..26..3..7.95..67231"); //(Hidden Unique Rectangle - type 1)
+            //boards.Add("5..291836.3.475.1...9386457.5.143...4..7.9..1...8.2.4.3...2.17..8.937.2.7.2.1...3"); //(Hidden Unique Rectangle - type 2)
+            //boards.Add(".2.58..3.35.....84.867...2..48.9.1565..6.8.4.963.5.278.9..6581.6..8...9283.....6."); //(Hidden Unique Rectangle - type 2b)
+            //boards.Add("5184726393.6859..44.9316...94562.3..861.34..5732.85..665..9.8.3293.48.6118..63..."); //(Hidden Unique Rectangle - type 2b - awesome example)
+
             //hard
             //boards.Add("..93.7.....142.87..7.......3...6......791..2......2..5..2....5......16.4..8.....9"); //Simple Colouring
             //boards.Add("..5...987.4..5...1..7......2...48....9.1.....6..2.....3..6..2.......9.7.......5.."); //X Cycles
@@ -51,19 +60,9 @@ namespace SudokuPrinter
             //boards.Add("6..3.2....5.....1..........7.26............543.........8.15........4.2........7.."); //X Cycle, Unique Rectangle, Grouped X-Cycle, Cell forcing chain, Almost Locked Set, Quad Forcing Chain, Unit Forcing Chain, Line Box Reduction
             //boards.Add("..5...987.4..5...1..7......2...48....9.1.....6..2.....3..6..2.......9.7.......5.."); //X Cycles
 
-            
+
             //boards.Add("6.2.5.........3.4..........43...8....1....2........7..5..27...........81...6....."); //X-cycles | Quad Forcing Chains | Unit forcing chains | Altern Inferencing chains | Bowman's Bingo -- Force Solve required
             //boards.Add("6.2.5.........4.3..........43...8....1....2........7..5..27...........81...6....."); //force required
-
-
-            //Example Boards
-            //boards.Add("42.9..386.6.2..7948.9.6.2517....3.259..1.26.32..5....8..4.2.5676827..439......812"); //Unique Rectangle | Also good because solver at sudokuwiki.org uses unneccessary techniques such as simple colouring & X-cycle which removes candidates but is unneccessary for solution
-            //boards.Add("1.957.3...7.39..1...3.1.597.8.743...492.5.78373.289.4.317.2.4..26..3..7.95..67231"); //(Hidden Unique Rectangle - type 1)
-            //boards.Add("5..291836.3.475.1...9386457.5.143...4..7.9..1...8.2.4.3...2.17..8.937.2.7.2.1...3"); //(Hidden Unique Rectangle - type 2)
-            //boards.Add(".2.58..3.35.....84.867...2..48.9.1565..6.8.4.963.5.278.9..6581.6..8...9283.....6."); //(Hidden Unique Rectangle - type 2b)
-            //boards.Add("5184726393.6859..44.9316...94562.3..861.34..5732.85..665..9.8.3293.48.6118..63..."); //(Hidden Unique Rectangle - type 2b - awesome example)
-
-            //boards.Add("....3..86....2..4..9..7852.3718562949..1423754..3976182..7.3859.392.54677..9.4132"); //Naked Triple/Quads
 
             //---special boards---
             //appendTop95Boards(boards);
@@ -85,8 +84,10 @@ namespace SudokuPrinter
                 techniques.Add(() => { if (!Techniques.removeHiddenBasic(board, unknowns)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns, 2)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns, 3)) forceIteration = true; });
-                techniques.Add(() => { if (!Techniques.removeHiddenCandidates(board, unknowns)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeHiddenCandidates(board, unknowns, 2)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeHiddenCandidates(board, unknowns, 3)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns, 4)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeHiddenCandidates(board, unknowns, 4)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removePointingPairs(board, unknowns)) forceIteration = true; });
                 //techniques.Add(() => { if (!Techniques.removeCubeCandidates(board, unknowns)) forceIteration = true; });
                 //techniques.Add(() => { if (!Techniques.removeSingleChainCandidates(board, unknowns)) forceIteration = true; });

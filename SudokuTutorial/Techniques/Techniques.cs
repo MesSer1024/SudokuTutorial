@@ -172,7 +172,7 @@ namespace SudokuTutorial.Techniques
         {
             if (isKnown())
             {
-                return string.Format("ID=[{3}], Row: {0}, Col: {1}, Block: {3}, Value={2}", Row + 1, Col + 1, Value, ID, Block + 1);
+                return string.Format("ID=[{3}], Cell: {0}{1}, Block: {4}, Value={2}", Convert.ToChar(65 + Row), Col + 1, Value, ID, Block + 1);
             }
             else
             {
@@ -181,7 +181,7 @@ namespace SudokuTutorial.Techniques
                 {
                     sb.Append(c);
                 }
-                return string.Format("ID=[{3}], Row: {0}, Col: {1}, Block: {4}, Candidate(s)={2}", Row + 1, Col + 1, sb.ToString(), ID, Block + 1);
+                return string.Format("ID=[{3}], Cell: {0}{1}, Block: {4}, Candidate(s)={2}", Convert.ToChar(65 + Row), Col + 1, sb.ToString(), ID, Block + 1);
             }
         }
     }
@@ -385,114 +385,181 @@ namespace SudokuTutorial.Techniques
             return potentialValues;
         }
 
-        public static bool removeHiddenCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        public static bool removeHiddenCandidates(SudokuBoard board, List<SudokuNode> unknowns, int depth)
         {
             bool needAnotherTechnique = true;
-            foreach (var node in unknowns)
+            Func<List<SudokuNode>, bool> fn = null;
+            switch (depth)
             {
-                bool progress = false;
-                //check rows
-                {
-                    //if row contains exactly 2 nodes that have candidates that can only be found in these 2 nodes...
-                    var rowNeighbours = board.getNodesByRow(node.Row);
-                    if (findHidden(rowNeighbours))
-                        progress = true;
-                }
+                case 2:
+                    fn = findHiddenPair;
+                    break;
+                case 3:
+                    fn = findHiddenTriplets;
+                    break;
+                case 4:
+                    fn = findHiddenQuads;
+                    break;
+            }
 
-                //check cols
+            foreach (var baseNode in unknowns)
+            {
                 {
-                    var colNeighbours = board.getNodesByColumn(node.Col);
-                    if (findHidden(colNeighbours))
-                        progress = true;
+                    var nodes = board.getNodesByBlock(baseNode.Block).FindAll(a => a.isKnown() == false);
+                    if (fn.Invoke(nodes))
+                    {
+                        needAnotherTechnique = false;
+                    }
                 }
-
-                //check blocks
                 {
-                    var blockNeighbours = board.getNodesByBlock(node.Block);
-                    if (findHidden(blockNeighbours))
-                        progress = true;
+                    var nodes = board.getNodesByRow(baseNode.Row).FindAll(a => a.isKnown() == false);
+                    if (fn.Invoke(nodes))
+                    {
+                        needAnotherTechnique = false;
+                    }
                 }
-
-                //end of iteration
-                if (progress || node.getCandidates().Length == 1)
-                    needAnotherTechnique = false;
+                {
+                    var nodes = board.getNodesByColumn(baseNode.Col).FindAll(a => a.isKnown() == false);
+                    if (fn.Invoke(nodes))
+                    {
+                        needAnotherTechnique = false;
+                    }
+                }
             }
             return needAnotherTechnique;
         }
 
-        private static bool findHidden(List<SudokuNode> neighbours)
+        private static bool findHiddenPair(List<SudokuNode> neighbours)
         {
+            int depth = 2;
             bool success = false;
-            var potentialValues = new Dictionary<int, List<SudokuNode>>();
-            for (int i = 0; i < 9; ++i)
-                potentialValues.Add(i + 1, new List<SudokuNode>());
-            foreach (var node in neighbours)
+            var candidateMap = populateCandidates(neighbours).Where(a => a.Value.Count == depth).ToDictionary( a => a.Key, a => a.Value);
+            var keys = candidateMap.Keys;
+            if (candidateMap.Keys.Count >= depth)
             {
-                foreach (var c in node.getCandidates())
-                    potentialValues[c].Add(node);
-            }
-
-            //if a number only has 2 nodes ... and another number only has 2 nodes, and those numbers share the same nodes...
-            var foo = potentialValues.Where(a => a.Value.Count == 2);
-            int n= foo.Count();
-            if (n > 1)
-            {
-                for (int i = 0; i < n; ++i)
+                for (int i = 0; i < keys.Count; ++i)
                 {
-                    bool iterationSuccess = false;
-                    var ele = foo.ElementAt(i);
-                    SudokuNode aNode = ele.Value[0];
-                    SudokuNode bNode = ele.Value[1];
-                    int pairedNum = 0;
-                    for (int j = i + 1; j < n; ++j)
+                    for (int j = i + 1; j < keys.Count; ++j)
                     {
-                        var pair = foo.ElementAt(j);
-                        if (pair.Value.Contains(aNode) && pair.Value.Contains(bNode))
+                        var orgNodes = candidateMap[keys.ElementAt(i)];
+                        var compNodes = candidateMap[keys.ElementAt(j)];
+                        bool hasSameNodes = Enumerable.Union(orgNodes, compNodes).Count() == depth;
+                        if (hasSameNodes)
                         {
-                            if(pairedNum == 0)
-                                pairedNum = pair.Key;
-                            else {
-                                //more than 2 items...
-                                pairedNum = 0;
+                            //the different sets contain exactly the same nodes, meaning that the candidates are shared among these nodes
+                            int totalCandidates = 0;
+                            orgNodes.ForEach(a => totalCandidates += a.getCandidates().Length);
+                            if (totalCandidates > depth * 2) //could also go for comparing depth towards a distinct list of candidates, but depth * 2 seems easier
+                            {
+                                orgNodes.ForEach(a => a.setCandidates(new[] { keys.ElementAt(i), keys.ElementAt(j) })); //remove all unneccessary candidates
+                                success = true;
                                 break;
                             }
                         }
                     }
+                }
+            }
 
-                    if (pairedNum > 0)
+            return success;
+        }
+
+        private static bool findHiddenTriplets(List<SudokuNode> neighbours)
+        {
+            int depth = 3;
+            bool success = false;
+            var candidateMap = populateCandidates(neighbours).Where(a => a.Value.Count >= 2 && a.Value.Count <= depth).ToDictionary(a => a.Key, a => a.Value);
+            var keys = candidateMap.Keys;
+            if (candidateMap.Keys.Count >= depth)
+            {
+                for (int i = 0; i < keys.Count; ++i)
+                {
+                    for (int j = i + 1; j < keys.Count; ++j)
                     {
-                        int aVal = pairedNum;
-                        int bVal = ele.Key;
-                        int aCandsStart = aNode.getCandidates().Length;
-                        int bCandsStart = bNode.getCandidates().Length;
-                        var cands = aNode.getCandidates();
-                        foreach (var c in cands)
+                        for (int k = j + 1; k < keys.Count; ++k)
                         {
-                            if (c != aVal && c != bVal)
+                            var nodes1 = candidateMap[keys.ElementAt(i)];
+                            var nodes2 = candidateMap[keys.ElementAt(j)];
+                            var nodes3 = candidateMap[keys.ElementAt(k)];
+                            var union = Enumerable.Union(nodes1, nodes2).Union(nodes3);
+                            bool hasSameNodes = union.Count() == depth;
+                            if (hasSameNodes)
                             {
-                                aNode.removeCandidate(c);
-                                iterationSuccess = true;
+                                //the different sets contain exactly the same nodes, meaning that the candidates are shared among these nodes
+                                var allCandidates = new List<int>();
+                                foreach (var n in union)
+                                {
+                                    allCandidates.AddRange(n.getCandidates());
+                                }
+                                if (allCandidates.Distinct().Count() > depth)
+                                {
+                                    var combinedSet = new[] { keys.ElementAt(i), keys.ElementAt(j), keys.ElementAt(k) };
+                                    foreach (var n in union)
+                                    {
+                                        var orgSet = n.getCandidates();
+                                        var set = orgSet.Intersect(combinedSet); //remove all unused candidates
+                                        n.setCandidates(set); 
+                                    }
+                                    success = true;
+                                    break;
+                                }
                             }
-                        }
-                        cands = bNode.getCandidates();
-                        foreach (var c in cands)
-                        {
-                            if (c != aVal && c != bVal)
-                            {
-                                bNode.removeCandidate(c);
-                                iterationSuccess = true;
-                            }
-                        }
-
-                        if (iterationSuccess)
-                        {
-                            success = true;
-                            Console.WriteLine("Using removeHidden, we successfully reduced candidates for {0} from originally {1} candidates", aNode, aCandsStart);
-                            Console.WriteLine("Using removeHidden, we successfully reduced candidates for {0} from originally {1} candidates", bNode, bCandsStart);
                         }
                     }
                 }
             }
+
+            return success;
+        }
+
+        private static bool findHiddenQuads(List<SudokuNode> neighbours)
+        {
+            int depth = 4;
+            bool success = false;
+            var candidateMap = populateCandidates(neighbours).Where(a => a.Value.Count >= 2 && a.Value.Count <= depth).ToDictionary(a => a.Key, a => a.Value);
+            var keys = candidateMap.Keys;
+            if (candidateMap.Keys.Count >= depth)
+            {
+                for (int i = 0; i < keys.Count; ++i)
+                {
+                    for (int j = i + 1; j < keys.Count; ++j)
+                    {
+                        for (int k = j + 1; k < keys.Count; ++k)
+                        {
+                            for (int l = k + 1; l < keys.Count; ++l)
+                            {
+                                var nodes1 = candidateMap[keys.ElementAt(i)];
+                                var nodes2 = candidateMap[keys.ElementAt(j)];
+                                var nodes3 = candidateMap[keys.ElementAt(k)];
+                                var nodes4 = candidateMap[keys.ElementAt(l)];
+                                var union = Enumerable.Union(nodes1, nodes2).Union(nodes3).Union(nodes4);
+                                bool hasSameNodes = union.Count() == depth;
+                                if (hasSameNodes)
+                                {
+                                    //the different sets contain exactly the same nodes, meaning that the candidates are shared among these nodes
+                                    var allCandidates = new List<int>();
+                                    foreach (var n in union)
+                                    {
+                                        allCandidates.AddRange(n.getCandidates());
+                                    }
+                                    if (allCandidates.Distinct().Count() > depth)
+                                    {
+                                        var combinedSet = new[] { keys.ElementAt(i), keys.ElementAt(j), keys.ElementAt(k), keys.ElementAt(l) };
+                                        foreach (var n in union)
+                                        {
+                                            var orgSet = n.getCandidates();
+                                            var set = orgSet.Intersect(combinedSet); //remove all unused candidates
+                                            n.setCandidates(set);
+                                        }
+                                        success = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             return success;
         }
 
@@ -671,6 +738,7 @@ namespace SudokuTutorial.Techniques
         public static bool removeNakedCandidates(SudokuBoard board, List<SudokuNode> unknowns, int depth)
         {
             //basically we base this solution against subsets, can the subset of candidates from x different nodes be bound to x nodes?
+            bool needAnotherTechnique = true;
             Func<List<SudokuNode>, bool> fn = null;
             switch (depth)
             {
@@ -691,26 +759,26 @@ namespace SudokuTutorial.Techniques
                     var nodes = board.getNodesByBlock(baseNode.Block).FindAll(a => a.isKnown() == false);
                     if (fn.Invoke(nodes))
                     {
-                        return false;
+                        needAnotherTechnique = false;
                     }
                 }
                 {
                     var nodes = board.getNodesByRow(baseNode.Row).FindAll(a => a.isKnown() == false);
                     if (fn.Invoke(nodes))
                     {
-                        return false;
+                        needAnotherTechnique = false;
                     }
                 }
                 {
                     var nodes = board.getNodesByColumn(baseNode.Col).FindAll(a => a.isKnown() == false);
                     if (fn.Invoke(nodes))
                     {
-                        return false;
+                        needAnotherTechnique = false;
                     }
                 }
             }
 
-            return true; //we need another technique to solve sudoku
+            return needAnotherTechnique;
         }
 
         private static bool removeNakedPair(List<SudokuNode> unitNodes)
