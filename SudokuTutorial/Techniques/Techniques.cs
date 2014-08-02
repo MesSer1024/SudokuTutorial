@@ -310,14 +310,14 @@ namespace SudokuTutorial.Techniques
             bool needAnotherTechnique = true;
             foreach (var node in unknowns)
             {
+                var c = node.getCandidates();
                 if (!handledThisTurn.ContainsKey(node.ID) && !node.isKnown())
                 {
                     handledThisTurn.Add(node.ID, 0);
-                    var neighbours = board.getNeighbours(node.ID);
-                    foreach (var neighbour in neighbours)
+                    var knownNeighbours = board.getNeighbours(node.ID).FindAll(a => a.isKnown() && c.Contains(a.Value));
+                    foreach (var neighbour in knownNeighbours)
                     {
-                        if (neighbour.isKnown() && node.getCandidates().Contains(neighbour.Value))
-                            node.removeCandidate(neighbour.Value);
+                        node.removeCandidate(neighbour.Value);
                     }
                     if (node.getCandidates().Length == 1)
                         needAnotherTechnique = false;
@@ -326,164 +326,31 @@ namespace SudokuTutorial.Techniques
             return needAnotherTechnique;
         }
 
-        public static bool removeNakedCandidates(SudokuBoard board, List<SudokuNode> unknowns)
-        {
-            bool needAnotherTechnique = true;
-
-            //making sure we only check each unit once...
-            BitArray rowState = new BitArray(9, false);
-            BitArray colState = new BitArray(9, false);
-            BitArray blockState = new BitArray(9, false);
-            Func<int, bool> colUnhandled = (col) =>
-            {
-                bool org = colState.Get(col);
-                colState.Set(col, true);
-                return org == false;
-            };
-            Func<int, bool> rowUnhandled = (row) =>
-            {
-                bool org = rowState.Get(row);
-                rowState.Set(row, true);
-                return org == false;
-            };
-            Func<int, bool> blockUnhandled = (block) =>
-            {
-                bool org = blockState.Get(block);
-                blockState.Set(block, true);
-                return org == false;
-            };
-            //---
-
-            foreach (var node in unknowns)
-            {
-                //check rows
-                if (rowUnhandled(node.Row))
-                {
-                    var rowNeighbours = board.getNodesByRow(node.Row);
-                    if (removedNakedPair(rowNeighbours))
-                        needAnotherTechnique = false;
-                }
-
-                //check cols
-                if (colUnhandled(node.Col))
-                {
-                    var colNeighbours = board.getNodesByColumn(node.Col);
-                    if (removedNakedPair(colNeighbours))
-                        needAnotherTechnique = false;
-                }
-
-                //check blocks
-                if (blockUnhandled(node.Block))
-                {
-                    var blockNeighbours = board.getNodesByBlock(node.Block);
-                    if (removedNakedPair(blockNeighbours))
-                        needAnotherTechnique = false;
-                }
-            }
-
-            return needAnotherTechnique;
-        }
-
-        private static bool removedNakedPair(List<SudokuNode> unitNeighbours)
-        {
-            //helper function to know what combinations we have allready checked
-            var checkedCombinations = new List<int>();
-            Func<int, int, bool> candidatesUntested = (a, b) =>
-            {
-                int id = a << 16 + b;
-                if (checkedCombinations.Contains(id))
-                    return false;
-
-                checkedCombinations.Add(id);
-                return true;
-            };
-
-            bool progress = false;
-            //find nodes that have 2 candidates
-            var potentialPairs = unitNeighbours.FindAll(a => { return a.getCandidates().Length == 2; });
-            if (potentialPairs.Count < 2)
-                return false;
-
-            //check candidates to see if they are a true match (exactly two items using same two values)
-            for (int i = 0; i < potentialPairs.Count; ++i)
-            {
-                var c = potentialPairs[i].getCandidates();
-                if (c.Length != 2)
-                    continue; //item has been changed due to previous iterations of algorithm
-                if (candidatesUntested(c[0], c[1]))
-                {
-                    SudokuNode exactMatch = null;
-                    //check candidates against all other potential matches
-                    for (int j = i + 1; j < potentialPairs.Count; ++j)
-                    {
-                        var d = potentialPairs[j].getCandidates();
-                        if (d.Length == 2 && c[0] == d[0] && c[1] == d[1])
-                        {
-                            if (exactMatch != null)
-                                throw new Exception("Logic Error!+!?!");
-                            exactMatch = potentialPairs[j];
-                            //break; //TODO#: uncomment and remove exception
-                        }
-                    }
-
-                    if (exactMatch != null)
-                    {
-                        //we know that these candidates can only exist on these two nodes, and can hence remove these candidates from all other nodes in this unit
-                        var diff = unitNeighbours.Except(new SudokuNode[2] { potentialPairs[i], exactMatch });
-                        removeCandidatesFromNodes(diff, c[0], c[1]);
-                    }
-                }
-            }
-            return progress;
-        }
-
-        private static bool removeCandidatesFromNodes(IEnumerable<SudokuNode> nodes, params int[] candidates)
-        {
-            bool candidatesRemoved = false;
-            foreach (var item in nodes)
-            {
-                if (!item.isKnown())
-                {
-                    var orgCount = item.getCandidates().Length;
-                    foreach (var c in candidates)
-                        item.removeCandidate(c);
-                    if (orgCount != item.getCandidates().Length)
-                        candidatesRemoved = true;
-                }
-            }
-            return candidatesRemoved;
-        }
-
         public static bool removeHiddenBasic(SudokuBoard board, List<SudokuNode> unknowns)
         {
             bool needAnotherTechnique = true;
             foreach (var node in unknowns)
             {
-                bool progress = false;
                 //check rows
                 {
                     var rowNeighbours = board.getNodesByRow(node.Row);
                     if (findHiddenBasic(rowNeighbours))
-                        progress = true;
+                        needAnotherTechnique = false;
                 }
 
                 //check cols
                 {
                     var colNeighbours = board.getNodesByColumn(node.Col);
                     if (findHiddenBasic(colNeighbours))
-                        progress = true;
+                        needAnotherTechnique = false;
                 }
 
                 //check blocks
                 {
                     var blockNeighbours = board.getNodesByBlock(node.Block);
                     if (findHiddenBasic(blockNeighbours))
-                        progress = true;
+                        needAnotherTechnique = false;
                 }
-
-                //end of iteration
-                if (progress || node.getCandidates().Length == 1)
-                    needAnotherTechnique = false;
             }
             return needAnotherTechnique;
         }
@@ -491,40 +358,31 @@ namespace SudokuTutorial.Techniques
         public static bool findHiddenBasic(List<SudokuNode> neighbours)
         {
             bool success = false;
+            for (int i = 0; i < 9; ++i)
+            {
+                int candidate = i + 1;
+                var matches = neighbours.FindAll(a => a.getCandidates().Contains(candidate)).ToList();
+                if (matches.Count == 1)
+                {
+                    //if a number is only referenced by 1 node, that node has to be that number
+                    matches[0].setCandidates(new[] { candidate }); //success of a technique is measured with item ending with only 1 candidate...
+                    success = true;
+                }
+            }
+            return success;
+        }
+
+        private static Dictionary<int, List<SudokuNode>> populateCandidates(List<SudokuNode> nodes)
+        {
             var potentialValues = new Dictionary<int, List<SudokuNode>>();
             for (int i = 0; i < 9; ++i)
                 potentialValues.Add(i + 1, new List<SudokuNode>());
-            foreach (var node in neighbours)
+            foreach (var node in nodes)
             {
                 foreach (var c in node.getCandidates())
                     potentialValues[c].Add(node);
             }
-
-            //if a number is only referenced by 1 node, that node has to be that number
-            var foo = potentialValues.Where(a => a.Value.Count == 1);
-            int n = foo.Count();
-            if (n > 0)
-            {
-                for (int i = 0; i < n; ++i)
-                {
-                    var ele = foo.ElementAt(i);
-                    if (ele.Value.Count > 1)
-                        throw new Exception("Foobar!");
-                    var node = ele.Value[0];
-                    var cand = node.getCandidates();
-                    var orgCount = node.getCandidates().Length;
-                    foreach (var c in cand)
-                    {
-                        if (c != ele.Key)
-                        {
-                            node.removeCandidate(c);
-                        }
-                    }
-                    if (orgCount != node.getCandidates().Length)
-                        success = true;
-                }
-            }
-            return success;
+            return potentialValues;
         }
 
         public static bool removeHiddenCandidates(SudokuBoard board, List<SudokuNode> unknowns)
@@ -810,60 +668,163 @@ namespace SudokuTutorial.Techniques
             return true;
         }
 
-        public static bool removeNakedManyCandidates(SudokuBoard board, List<SudokuNode> unknowns, int depth)
+        public static bool removeNakedCandidates(SudokuBoard board, List<SudokuNode> unknowns, int depth)
         {
-            //basically we base this solution against subsets, can the subset of candidates from x different nodes fit in 4 nodes?
-            bool needAnotherTechnique = true;
+            //basically we base this solution against subsets, can the subset of candidates from x different nodes be bound to x nodes?
+            Func<List<SudokuNode>, bool> fn = null;
+            switch (depth)
+            {
+                case 2:
+                    fn = removeNakedPair;
+                    break;
+                case 3:
+                    fn = removeNakedTriples;
+                    break;
+                case 4:
+                    fn = removeNakedQuads;
+                    break;
+            }
 
             foreach (var baseNode in unknowns)
             {
-                //block
                 {
-                    //find nodes where number of candidates are in range
-                    var nodes = board.getNodesByBlock(baseNode.Block).FindAll( a => a.getCandidates().Length >= 2 && a.getCandidates().Length <= depth);
-                    for(int i=0; i < nodes.Count; ++i)
+                    var nodes = board.getNodesByBlock(baseNode.Block).FindAll(a => a.isKnown() == false);
+                    if (fn.Invoke(nodes))
                     {
-                        for (int j = i + 1; j < nodes.Count; ++j)
+                        return false;
+                    }
+                }
+                {
+                    var nodes = board.getNodesByRow(baseNode.Row).FindAll(a => a.isKnown() == false);
+                    if (fn.Invoke(nodes))
+                    {
+                        return false;
+                    }
+                }
+                {
+                    var nodes = board.getNodesByColumn(baseNode.Col).FindAll(a => a.isKnown() == false);
+                    if (fn.Invoke(nodes))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true; //we need another technique to solve sudoku
+        }
+
+        private static bool removeNakedPair(List<SudokuNode> unitNodes)
+        {
+            int depth = 2;
+            var nodes = unitNodes.FindAll(a => a.getCandidates().Length == depth);
+            for (int i = 0; i < nodes.Count; ++i)
+            {
+                for (int j = i + 1; j < nodes.Count; ++j)
+                {
+                    var candidates = combineCandidates(nodes[i], nodes[j]).Distinct();
+
+                    if (candidates.Count() <= depth)
+                    {
+                        //the entire subset of candidates from all nodes can fit inside x nodes
+                        var closedSet = new List<SudokuNode>() { nodes[i], nodes[j] };
+                        var otherBlockNodes = unitNodes.Except(closedSet);
+                        bool couldRemoveCandidate = false;
+                        foreach (var node in otherBlockNodes)
                         {
-                            for (int k = j + 1; k < nodes.Count; ++k)
+                            var oldSet = node.getCandidates();
+                            var newSet = oldSet.Except(candidates).ToArray();
+                            if (oldSet.Length > newSet.Length)
                             {
-                                for (int l = k + 1; l < nodes.Count; ++l)
+                                node.setCandidates(newSet);
+                                couldRemoveCandidate = true;
+                            }
+                        }
+                        //break if something was changed
+                        if (couldRemoveCandidate)
+                            return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static bool removeNakedTriples(List<SudokuNode> unitNodes)
+        {
+            int depth = 3;
+            var nodes = unitNodes.FindAll(a => a.getCandidates().Length >= 2 && a.getCandidates().Length <= depth);
+            for (int i = 0; i < nodes.Count; ++i)
+            {
+                for (int j = i + 1; j < nodes.Count; ++j)
+                {
+                    for (int k = j + 1; k < nodes.Count; ++k)
+                    {
+                        var candidates = combineCandidates(nodes[i], nodes[j], nodes[k]).Distinct();
+
+                        if (candidates.Count() <= depth)
+                        {
+                            //the entire subset of candidates from all nodes can fit inside x nodes
+                            var closedSet = new List<SudokuNode>() { nodes[i], nodes[j], nodes[k] };
+                            var otherBlockNodes = unitNodes.Except(closedSet);
+                            bool couldRemoveCandidate = false;
+                            foreach (var node in otherBlockNodes)
+                            {
+                                var oldSet = node.getCandidates();
+                                var newSet = oldSet.Except(candidates).ToArray();
+                                if (oldSet.Length > newSet.Length)
                                 {
-                                    var candidates = combineCandidates(nodes[i], nodes[j], nodes[k], nodes[l]).Distinct();
+                                    node.setCandidates(newSet);
+                                    couldRemoveCandidate = true;
+                                }
+                            }
+                            //break if something was changed
+                            if (couldRemoveCandidate)
+                                return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
 
-                                    if (candidates.Count() <= depth)
+        private static bool removeNakedQuads(List<SudokuNode> unitNodes)
+        {
+            int depth = 4;
+            var nodes = unitNodes.FindAll(a => a.getCandidates().Length >= 2 && a.getCandidates().Length <= depth);
+            for (int i = 0; i < nodes.Count; ++i)
+            {
+                for (int j = i + 1; j < nodes.Count; ++j)
+                {
+                    for (int k = j + 1; k < nodes.Count; ++k)
+                    {
+                        for (int l = k + 1; l < nodes.Count; ++l)
+                        {
+                            var candidates = combineCandidates(nodes[i], nodes[j], nodes[k], nodes[l]).Distinct();
+
+                            if (candidates.Count() <= depth)
+                            {
+                                //the entire subset of candidates from all nodes can fit inside x nodes
+                                var closedSet = new List<SudokuNode>() { nodes[i], nodes[j], nodes[k], nodes[l] };
+                                var otherBlockNodes = unitNodes.Except(closedSet);
+                                bool couldRemoveCandidate = false;
+                                foreach (var node in otherBlockNodes)
+                                {
+                                    var oldSet = node.getCandidates();
+                                    var newSet = oldSet.Except(candidates).ToArray();
+                                    if (oldSet.Length > newSet.Length)
                                     {
-                                        //the entire subset of candidates from all nodes can fit inside x nodes
-                                        var closedSet = new List<SudokuNode>() { nodes[i], nodes[j], nodes[k], nodes[l] };
-                                        var otherBlockNodes = board.getNodesByBlock(baseNode.Block).Except(closedSet);
-
-                                        foreach (var node in otherBlockNodes)
-                                        {
-                                            var oldSet = node.getCandidates();
-                                            var newSet = oldSet.Except(candidates).ToArray();
-                                            if (oldSet.Length > newSet.Length)
-                                            {
-                                                node.setCandidates(newSet);
-                                                needAnotherTechnique = false;
-                                            }
-                                        }
-                                        //break if something was changed
-                                        if (needAnotherTechnique == false)
-                                            return needAnotherTechnique;
+                                        node.setCandidates(newSet);
+                                        couldRemoveCandidate = true;
                                     }
                                 }
+                                //break if something was changed
+                                if (couldRemoveCandidate)
+                                    return true;
                             }
                         }
                     }
                 }
             }
-
-            return needAnotherTechnique;
-        }
-
-        public static IEnumerable<T> combine<T>(params ICollection<T>[] toCombine)
-        {
-            return toCombine.SelectMany(x => x);
+            return false;
         }
 
         private static List<int> combineCandidates(params SudokuNode[] nodes)

@@ -17,29 +17,29 @@ namespace SudokuPrinter
 
             //http://www.thonky.com/sudoku/
             //basic technique
-            //boards.Add("..5.398...82.1...7.4.75.62..3.49.................23.8..91.82.6.5...6.93...894.1..");
-            //boards.Add("..5.398...82.1...7.4.75.62..3.49.................23.8..91.82.6.5...6.93...894.1..");
-            //boards.Add("1...8...3.7.5...81....1365...73..........8..9.4.6.25....9.....8....6...4..3...9..");
+            boards.Add("..5.398...82.1...7.4.75.62..3.49.................23.8..91.82.6.5...6.93...894.1..");
+            boards.Add("..5.398...82.1...7.4.75.62..3.49.................23.8..91.82.6.5...6.93...894.1..");
+            boards.Add("1...8...3.7.5...81....1365...73..........8..9.4.6.25....9.....8....6...4..3...9..");
 
-            ////advanced (not naked)
-            //boards.Add("31....2..9..7....3.....9.6....8........9.28...7.6.5.2.....2.5...5....1.4.64......");
-            //boards.Add("1.........5....1.2..25.74....5.38.1......467.7....5..9.9.....8.......9...734.....");
+            //advanced (not naked)
+            boards.Add("31....2..9..7....3.....9.6....8........9.28...7.6.5.2.....2.5...5....1.4.64......");
+            boards.Add("1.........5....1.2..25.74....5.38.1......467.7....5..9.9.....8.......9...734.....");
 
-            ////advanced
-            //boards.Add(".....1.68..4.26.3.286.7....84..1...66..7..........4...51......7....5.9..769...8.2");
-            //boards.Add("3.8.2..7.....31....4......8.....8.57..3..61..5.....2.675...9............4..75..9.");
-            //boards.Add("7.....9......8..67..37...141..6.2....9.....7....9.8..637...41..95..3......6.....2");
-            //boards.Add("....65...1...9.5...7.28...1..7.14..64.9...32..5..........63.4.....8.....2....1.7.");
-            //boards.Add(".....5..1...9...36.9..2......4....9.......583.....7..2.7...1.2..5.4..1...1..5.37.");
-            //boards.Add(".1.........91..36...68..79.89.5..2....7.......4...9.5....3.....9.2.6..8..3...4...");
-            //boards.Add("13......95.64.1......29.....8....5.3.7...4.....3.7..2.....4..9......3....276.8.3.");
-            //boards.Add("4...2..8...1..495....5.1....53....9.........1..6..7...........7.....2....7.34..26");
-            //boards.Add("75..4..8.........2.93....5..1...8...5...63.7.......4.....72.3....19.62..8.....1..");
-            //boards.Add("..219.4....5....3.......6.5..19...87.2...6...5.8........6......41.6.7..97..8...2.");
-            //boards.Add(".3...8.....7.13.8..6.5..314......95.6.....273.72......291..5.3..4.39.5.....7...6.");
+            //advanced
+            boards.Add(".....1.68..4.26.3.286.7....84..1...66..7..........4...51......7....5.9..769...8.2");
+            boards.Add("3.8.2..7.....31....4......8.....8.57..3..61..5.....2.675...9............4..75..9.");
+            boards.Add("7.....9......8..67..37...141..6.2....9.....7....9.8..637...41..95..3......6.....2");
+            boards.Add("....65...1...9.5...7.28...1..7.14..64.9...32..5..........63.4.....8.....2....1.7.");
+            boards.Add(".....5..1...9...36.9..2......4....9.......583.....7..2.7...1.2..5.4..1...1..5.37.");
+            boards.Add(".1.........91..36...68..79.89.5..2....7.......4...9.5....3.....9.2.6..8..3...4...");
+            boards.Add("13......95.64.1......29.....8....5.3.7...4.....3.7..2.....4..9......3....276.8.3.");
+            boards.Add("4...2..8...1..495....5.1....53....9.........1..6..7...........7.....2....7.34..26");
+            boards.Add("75..4..8.........2.93....5..1...8...5...63.7.......4.....72.3....19.62..8.....1..");
+            boards.Add("..219.4....5....3.......6.5..19...87.2...6...5.8........6......41.6.7..97..8...2.");
+            boards.Add(".3...8.....7.13.8..6.5..314......95.6.....273.72......291..5.3..4.39.5.....7...6.");
 
             //pointing pairs required
-            //boards.Add("5..683....8..7......6.2..7....2.5....9.7..35.81.........9......43....1........82.");
+            boards.Add("5..683....8..7......6.2..7....2.5....9.7..35.81.........9......43....1........82.");
 
             //hard
             //boards.Add("..93.7.....142.87..7.......3...6......791..2......2..5..2....5......16.4..8.....9"); //Simple Colouring
@@ -63,7 +63,7 @@ namespace SudokuPrinter
             //boards.Add(".2.58..3.35.....84.867...2..48.9.1565..6.8.4.963.5.278.9..6581.6..8...9283.....6."); //(Hidden Unique Rectangle - type 2b)
             //boards.Add("5184726393.6859..44.9316...94562.3..861.34..5732.85..665..9.8.3293.48.6118..63..."); //(Hidden Unique Rectangle - type 2b - awesome example)
 
-            boards.Add("....3..86....2..4..9..7852.3718562949..1423754..3976182..7.3859.392.54677..9.4132"); //Naked Triple/Quads
+            //boards.Add("....3..86....2..4..9..7852.3718562949..1423754..3976182..7.3859.392.54677..9.4132"); //Naked Triple/Quads
 
             //---special boards---
             //appendTop95Boards(boards);
@@ -80,11 +80,13 @@ namespace SudokuPrinter
                 bool forceIteration = false;
                 techniques.Clear();
 
+                //if using "forceIteration" you CANT set values, you have to reduce candidates to 1 on a node (you can but, as a guideline you can't)
                 techniques.Add(() => { if (!Techniques.removeBasicCandidates(board, unknowns)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeHiddenBasic(board, unknowns)) forceIteration = true; });
-                techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns)) forceIteration = true; });
-                techniques.Add(() => { if (!Techniques.removeNakedManyCandidates(board, unknowns, 4)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns, 2)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns, 3)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removeHiddenCandidates(board, unknowns)) forceIteration = true; });
+                techniques.Add(() => { if (!Techniques.removeNakedCandidates(board, unknowns, 4)) forceIteration = true; });
                 techniques.Add(() => { if (!Techniques.removePointingPairs(board, unknowns)) forceIteration = true; });
                 //techniques.Add(() => { if (!Techniques.removeCubeCandidates(board, unknowns)) forceIteration = true; });
                 //techniques.Add(() => { if (!Techniques.removeSingleChainCandidates(board, unknowns)) forceIteration = true; });
@@ -102,7 +104,7 @@ namespace SudokuPrinter
                         unknowns.Clear();
                         Techniques.fillUnknowns(board, unknowns);
                     }
-                    //remove candidates
+
                     for (int i = 0; i < techniques.Count; ++i)
                     {
                         level++;
@@ -130,7 +132,7 @@ namespace SudokuPrinter
                         if (forceIteration)
                         {
                             iterate = true;
-                            Console.WriteLine("Forcing another iteration due to candidates being removed");
+                            Console.WriteLine("Forcing another iteration due to candidates being removed by using technique {0}", level);
                         }
                     }
                 }
@@ -238,10 +240,13 @@ namespace SudokuPrinter
         {
             //validate board
             var allKnown = board.getNodes().FindAll(a => a.isKnown());
-            if (throwNotSolved && allKnown.Count != 81)
+            if (allKnown.Count != 81)
             {
                 printCandidates(board);
-                throw new Exception("Solution is unsolved");
+                if (throwNotSolved)
+                    throw new Exception("Solution is unsolved");
+                else
+                    Console.WriteLine("Board {0} was not solved!", board.ToString());
             }
             for (int value = 0; value < 9; ++value)
             {
