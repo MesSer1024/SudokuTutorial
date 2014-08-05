@@ -14,6 +14,8 @@ namespace SudokuTutorial
         {
             if (input.Length != 81)
                 throw new Exception("Invalid board size!");
+            
+            input = input.Replace('0', '.');
             var board = new SudokuBoard(input);
             var nodes = board.getNodes();
             for (int i = 0; i < input.Length; ++i)

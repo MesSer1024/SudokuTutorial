@@ -151,6 +151,11 @@ namespace SudokuTutorial.Techniques
         public int Row { get { return _id / 9; } }
         public int Col { get { return _id % 9; } }
         public int Block { get { return (Row / 3) * 3 + Col / 3; } }
+
+        public static bool SameUnit(SudokuNode a, SudokuNode b)
+        {
+            return a.Row == b.Row || a.Col == b.Col || a.Block == b.Block;
+        }
         //public int Unit
         //{
         //    get
@@ -172,7 +177,7 @@ namespace SudokuTutorial.Techniques
         {
             if (isKnown())
             {
-                return string.Format("ID=[{3}], Cell: {0}{1}, Block: {4}, Value={2}", Convert.ToChar(65 + Row), Col + 1, Value, ID, Block + 1);
+                return string.Format("ID=[{3}], Cell: {0}{1}, Block: {4}, Value={2}", Convert.ToChar(65 + Row), Col + 1, Value, ID.ToString("D2"), Block + 1);
             }
             else
             {
@@ -181,9 +186,11 @@ namespace SudokuTutorial.Techniques
                 {
                     sb.Append(c);
                 }
-                return string.Format("ID=[{3}], Cell: {0}{1}, Block: {4}, Candidate(s)={2}", Convert.ToChar(65 + Row), Col + 1, sb.ToString(), ID, Block + 1);
+                return string.Format("ID=[{3}], Cell: {0}{1}, Block: {4}, Candidate(s)={2}", Convert.ToChar(65 + Row), Col + 1, sb.ToString(), ID.ToString("D2"), Block + 1);
             }
         }
+
+        public string Cell { get { return String.Format("{0}{1}", Convert.ToChar(65 + Row), Col + 1); } }
     }
 
     public class SudokuBoard
@@ -563,177 +570,229 @@ namespace SudokuTutorial.Techniques
             return success;
         }
 
-        public static bool removeSingleChainCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        public class SudokuNodeLink
         {
-            Func<SudokuNode, SudokuNode, ulong> createIdentifier = (a, b) =>
+            public SudokuNode NodeA { get; private set; }
+            public SudokuNode NodeB { get; private set; }
+            public bool Handled { get; set; }
+
+            public SudokuNodeLink(SudokuNode node1, SudokuNode node2)
             {
-                var x = a.ID;
-                var y = b.ID;
-
-                ulong id = x > y ? (uint)y | ((ulong)x << 32) :
-                   (uint)x | ((ulong)y << 32);
-                return id;
-            };
-            Func<SudokuNode, SudokuNode, KeyValuePair<ulong, KeyValuePair<SudokuNode, SudokuNode>>> foobar = (alpha, beta) =>
-            {
-                var x = alpha.ID;
-                var y = beta.ID;
-
-                ulong id = x > y ? (uint)y | ((ulong)x << 32) : (uint)x | ((ulong)y << 32);
-                return new KeyValuePair<ulong, KeyValuePair<SudokuNode, SudokuNode>>(id, new KeyValuePair<SudokuNode, SudokuNode>(alpha, beta));
-            };
-
-            bool needAnotherTechnique = true;
-
-            for (int candidate = 0; candidate < 9; ++candidate)
-            {
-                var allNodesWithCandidate = unknowns.FindAll( a => a.getCandidates().Contains(candidate));
-                var pairs = new Dictionary<ulong, KeyValuePair<SudokuNode, SudokuNode>>();
-
-                //fill units
-                for(int i=0; i<9; ++i) {
-                    var nodesOnRow = allNodesWithCandidate.FindAll(a => a.Row == i);
-                    var nodesOnCol = allNodesWithCandidate.FindAll(a => a.Col == i);
-                    var nodesOnBlock = allNodesWithCandidate.FindAll(a => a.Block == i);
-
-                    if (nodesOnRow.Count == 2)
-                    {
-                        var p = foobar(nodesOnRow[0], nodesOnRow[1]);
-                        if (!pairs.ContainsKey(p.Key))
-                            pairs.Add(p.Key, p.Value);
-                    }
-                    if (nodesOnCol.Count == 2)
-                    {
-                        var p = foobar(nodesOnCol[0], nodesOnCol[1]);
-                        if (!pairs.ContainsKey(p.Key))
-                            pairs.Add(p.Key, p.Value);
-                    }
-                    if (nodesOnBlock.Count == 2)
-                    {
-                        var p = foobar(nodesOnBlock[0], nodesOnBlock[1]);
-                        if(!pairs.ContainsKey(p.Key))
-                            pairs.Add(p.Key, p.Value);
-                    }
-                }
-
-                foreach (var pair in pairs.Values)
-                {
-                    //pair.Key.Value = 5;
-                }
-
+                NodeA = node1;
+                NodeB = node2;
+                Handled = false;
             }
 
-            return needAnotherTechnique;
+            public override string ToString()
+            {
+                return String.Format("A={0,2}, B={1,2}, Handled={2,6}", NodeA.Cell, NodeB.Cell, Handled);
+            }
         }
+
+        enum NodeStatus
+        {
+            Unknown,
+            On,
+            Off,
+            Both
+        };
 
         public static bool removeSimpleColoringCandidates(SudokuBoard board, List<SudokuNode> unknowns)
         {
-            for (int candidate = 0; candidate < 9; ++candidate)
+            //Single Chains
+            //desc: remove candidates due to building a hierarchy tree between nodes that share the same candidate
+            // for every depth traversal, you change between toggling node as "on" or "off"
+            // finding start point:
+            //  need to find a node that have a candidate that is shared between EXACTLY two nodes inside a [row/col/block] 
+            // that means it can be shared both due to block, or due to row, but not more than 2 items for each type
+            var allCandidates = populateCandidates(unknowns);
+            bool needAnotherTechnique = true;
+
+            for (int candidate = 1; candidate <= 9; ++candidate)
             {
-                foreach (var startNode in unknowns)
-                {
-                    //Single Chains
-                    //desc: remove candidates due to building a hierarchy tree between nodes that share the same candidate
-                    // for every depth traversal, you change between toggling node as "on" or "off"
-                    // finding start point:
-                    //  need to find a node that have a candidate that is shared between EXACTLY two nodes inside a [row/col/block] 
-                    // that means it can be shared both due to block, or due to row, but not more than 2 items for each type
+                var allNodesWithCandidate = allCandidates[candidate];
+                if (allNodesWithCandidate.Count > 3) //random big enough number, might be wrong
+                {   
+                    var pairs = new List<SudokuNodeLink>();
+                    var count = new Dictionary<SudokuNode, int>();
 
-                    if (startNode.getCandidates().Contains(candidate))
+                    //build pairs
+                    for (int i = 0; i < 9; i++)
                     {
-                        var openNodes = new List<SudokuNode>();
-                        var neighbours = board.getNeighbours(startNode.ID);
-                        var sharedCandidates = neighbours.FindAll(a => a != startNode && a.getCandidates().Contains(candidate));
-                        var rowMatches = sharedCandidates.FindAll(a => a.Row == startNode.Row);
-                        var colMatches = sharedCandidates.FindAll(a => a.Col == startNode.Col);
-                        var blockMatches = sharedCandidates.FindAll(a => a.Block == startNode.Block);
+                        //find all bi-location links (candidates that only exist twice within a row/col/block)
+                        var rowMatches = allCandidates[candidate].FindAll(a => a.Row == i);
+                        var colMatches = allCandidates[candidate].FindAll(a => a.Col == i);
+                        var blockMatches = allCandidates[candidate].FindAll(a => a.Block == i);
 
-                        //if there only are two items in a row/col/block we can start counting from this item...
-                        if (rowMatches.Count == 1 || colMatches.Count == 1 || blockMatches.Count == 1)
+                        if (rowMatches.Count == 2) {
+                            pairs.Add(new SudokuNodeLink(rowMatches[0], rowMatches[1]));
+                            IncrementDictionary(count, rowMatches[0]);
+                            IncrementDictionary(count, rowMatches[1]);
+                        }
+                        if (colMatches.Count == 2) {
+                            pairs.Add(new SudokuNodeLink(colMatches[0], colMatches[1]));
+                            IncrementDictionary(count, colMatches[0]);
+                            IncrementDictionary(count, colMatches[1]);
+
+                        }
+                        if (blockMatches.Count == 2) {
+                            pairs.Add(new SudokuNodeLink(blockMatches[0], blockMatches[1]));
+                            IncrementDictionary(count, blockMatches[0]);
+                            IncrementDictionary(count, blockMatches[1]);
+                        }
+                    }
+
+                    //build chains between pair - label is there to be able to retry iteration with same data if it turns out that the longest chain wasn't enough to find us a solution
+                    var closed = new List<SudokuNode>();
+                    if (pairs.Count > 1)
+                    {
+                    retryIteration:
+                        var foo = count.OrderByDescending(a => a.Value).Except(count.Where(a => closed.Contains(a.Key)));
+
+                        var open = new List<SudokuNode>();
+                        int openIdx = 0;
+                        //var closed = new List<SudokuNode>();
+                        var decorations = new Dictionary<SudokuNode, NodeStatus>();
+                        var startNode = foo.FirstOrDefault();
+                        if(startNode.Key == null)
+                            return true;
+                        open.Add(startNode.Key);
+                        decorations.Add(startNode.Key, NodeStatus.On);
+
+                        while (openIdx < open.Count)
                         {
-                            var statusDecorator = new Dictionary<SudokuNode, bool>();
+                            var node = open[openIdx++];
+                            var nodeStatus = decorations[node];
+                            var linkConnections = pairs.FindAll(a => (a.NodeA == node || a.NodeB == node) && a.Handled == false);
 
-                            if (rowMatches.Count == 1)
-                                openNodes.AddRange(rowMatches);
-                            if (colMatches.Count == 1)
-                                openNodes.AddRange(colMatches);
-                            if (blockMatches.Count == 1)
-                                openNodes.AddRange(blockMatches);
-
-                            statusDecorator.Add(startNode, true);
-                            foreach(var n in sharedCandidates) {
-                                if(!statusDecorator.ContainsKey(n)) {
-                                    statusDecorator.Add(n, !statusDecorator[startNode]);
-                                }
-                            }
-
-                            while (openNodes.Count > 0)
+                            foreach (var link in linkConnections)
                             {
-                                var currNode = openNodes[0];
-                                openNodes.RemoveAt(0);
-                                if (statusDecorator.ContainsKey(currNode))
-                                    continue;
-
-                                neighbours = board.getNeighbours(currNode.ID);
-                                sharedCandidates = neighbours.FindAll(a => a != currNode && a.getCandidates().Contains(candidate));
-                                rowMatches = sharedCandidates.FindAll(a => a.Row == currNode.Row);
-                                colMatches = sharedCandidates.FindAll(a => a.Col == currNode.Col);
-                                blockMatches = sharedCandidates.FindAll(a => a.Block == currNode.Block);
-
-                                if (rowMatches.Count == 1)
-                                    openNodes.Add(rowMatches[0]);
-                                if (colMatches.Count == 1)
-                                    openNodes.AddRange(colMatches);
-                                if (blockMatches.Count == 1)
-                                    openNodes.AddRange(blockMatches);
-
-                                foreach (var n in sharedCandidates)
+                                var otherNode = getOtherNode(link, node);
+                                if (!open.Contains(otherNode))
                                 {
-                                    if (!statusDecorator.ContainsKey(n))
-                                        statusDecorator.Add(n, !statusDecorator[currNode]);
+                                    open.Add(otherNode);
                                 }
-                            }
 
-                            //all items have been searched for this value...
-                            //verify the items that we traversed and see if we have two items in same "block/col/row" where they are "on" or "off"
-                            foreach (var pair in statusDecorator)
+                                SetInversedNodeStatus(node, link, decorations);
+                                link.Handled = true;
+                            }
+                        }
+
+                        if (decorations.Count > 0)
+                        {
+                            //Basic rule: Either ALL candidates marked as 'on' OR marked as 'off' is the solution - This is IMPORTANT!
+
                             {
-                                bool itemStatus = statusDecorator[pair.Key];
-                                var checks = board.getNeighbours(pair.Key.ID);
-                                var foobars = new List<SudokuNode>();
-                                foobars.Add(pair.Key);
-                                checks.ForEach((a) =>
+                                //rule 2: Twice in a unit - If any unit has the same color twice, that color can not be the solution - and ALL items with that color can be removed
                                 {
-                                    if (statusDecorator.ContainsKey(a) && statusDecorator[a] == itemStatus)
+                                    var statusOn = decorations.Select(a => a.Key).Where(a => decorations[a] == NodeStatus.On).ToList();
+                                    for (int a = 0; a < statusOn.Count; ++a)
                                     {
-                                        foobars.Add(a);
-                                    }
-                                });
+                                        for (int b = a + 1; b < statusOn.Count; ++b)
+                                        {
+                                            if (SudokuNode.SameUnit(statusOn[a], statusOn[b]))
+                                            {
+                                                needAnotherTechnique = false;
 
-                                if (foobars.Count > 1)
+                                            }
+                                        }
+                                    }
+                                }
+
                                 {
-                                    //foreach (var p in statusDecorator)
-                                    //{
-                                    //    if (p.Value == itemStatus)
-                                    //    {
-                                    //        p.Key.removeCandidate(candidate);
-                                    //    }
-                                    //}
-                                    return false;
+                                    var statusOff = decorations.Select(a => a.Key).Where(a => decorations[a] == NodeStatus.Off).ToList();
+                                    for (int a = 0; a < statusOff.Count; ++a)
+                                    {
+                                        for (int b = a + 1; b < statusOff.Count; ++b)
+                                        {
+                                            if (SudokuNode.SameUnit(statusOff[a], statusOff[b]))
+                                            {
+                                                needAnotherTechnique = false;
+                                                statusOff.ForEach(apa => apa.removeCandidate(candidate));
+                                            }
+                                        }
+                                    }
                                 }
                             }
+
+                            {
+                                //AFAIK: these two rules seems to be the same when implemented like this?
+                                //rule 4: Two colours in a unit - If a unit contains both "on & off" all other candidates in that unit can be removed
+                                //rule 5: Two colours elsewhere - If a node can see two other nodes which are "on & off", we know that THIS node can be removed (since either on or off is the solution, since this is seen by both, it can't be right)
+                                var uncoloredNodes = allNodesWithCandidate.Except(decorations.Keys);
+                                foreach (var n in uncoloredNodes)
+                                {
+                                    var coloredNeighbours = board.getNeighbours(n.ID).Intersect(decorations.Keys);
+                                    bool marked = false;
+                                    bool unmarked = false;
+
+                                    coloredNeighbours.All(a =>
+                                    {
+                                        if (decorations[a] == NodeStatus.On) marked = true;
+                                        if (decorations[a] == NodeStatus.Off) unmarked = true;
+                                        return true;
+                                    });
+
+                                    if (marked && unmarked)
+                                    {
+                                        n.removeCandidate(candidate);
+                                        needAnotherTechnique = false;
+                                    }
+                                }
+                            }
+                        }
+
+                        if(needAnotherTechnique && pairs.Count( a => a.Handled == false) > 1) {
+                            closed.AddRange(open);
+                            goto retryIteration; // There might exist more chains that could help us solve this puzzle
                         }
                     }
                 }
             }
-            return true;
+            return needAnotherTechnique;
         }
 
-        public static bool removeCubeCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        private static SudokuNode getOtherNode(SudokuNodeLink link, SudokuNode orgNode)
         {
-            //throw new NotImplementedException();
-            return true;
+            return link.NodeA == orgNode ? link.NodeB : link.NodeA;
         }
+
+        private static void SetInversedNodeStatus(SudokuNode refNode, SudokuNodeLink link, Dictionary<SudokuNode, NodeStatus> decorations)
+        {
+            var status = decorations[refNode];
+            var otherNode = getOtherNode(link, refNode);
+            if(status == NodeStatus.Unknown || status == NodeStatus.Both) {
+                Console.WriteLine("Unable to set status of {0} since status of {1} is {2}", otherNode, refNode, status);
+                return;
+            }
+
+            if(decorations.ContainsKey(otherNode))
+            {
+                var otherStatus = decorations[otherNode];
+                if (status == otherStatus)
+                {
+                    decorations[otherNode] = NodeStatus.Both;
+                }
+            }
+            else {
+                decorations.Add(otherNode, status == NodeStatus.On ? NodeStatus.Off : NodeStatus.On);
+            }
+
+        }
+
+        private static void IncrementDictionary(Dictionary<SudokuNode, int> dic, SudokuNode key)
+        {
+            if (dic.ContainsKey(key))
+                dic[key] = dic[key] + 1;
+            else
+                dic.Add(key, 1);
+        }
+
+        //public static bool removeCubeCandidates(SudokuBoard board, List<SudokuNode> unknowns)
+        //{
+        //    //throw new NotImplementedException();
+        //    return true;
+        //}
 
         public static bool removeNakedCandidates(SudokuBoard board, List<SudokuNode> unknowns, int depth)
         {
@@ -964,6 +1023,53 @@ namespace SudokuTutorial.Techniques
             }
 
             return needAnotherTechnique;
+        }
+
+        public static bool removeBoxLineReductions(SudokuBoard board, List<SudokuNode> unknowns)
+        {
+            bool needOtherTechnique = true;
+            //find all nodes where a candidate for nodes in a row/col is bound to ONE block
+            //every other node referring to that candidate in that block can be removed (unless the ones on specific row/col)
+            for (int i = 0; i < 9; ++i)
+            {
+                var candidate = i + 1;
+                var nodeCandidates = unknowns.FindAll(a => a.getCandidates().Contains(candidate));
+                if(nodeCandidates.Count > 2) {
+                    for (int j = 0; j < 9; ++j)
+                    {
+                        {
+                            var rowMatches = nodeCandidates.FindAll(a => a.Row == j);
+                            var rowRef = rowMatches.FirstOrDefault();
+                            if (rowRef != null && rowMatches.TrueForAll(a => a.Block == rowRef.Block))
+                            {
+                                var others = nodeCandidates.Where(a => a.Block == rowRef.Block && a.Row != rowRef.Row).ToList();
+                                if (others.Count > 0)
+                                {
+                                    needOtherTechnique = false;
+                                    foreach (var n in others)
+                                        n.removeCandidate(candidate);
+                                }
+                            }
+                        }
+
+                        {
+                            var colMatches = nodeCandidates.FindAll(a => a.Col == j);
+                            var colRef = colMatches.FirstOrDefault();
+                            if (colRef != null && colMatches.TrueForAll(a => a.Block == colRef.Block))
+                            {
+                                var others = nodeCandidates.Where(a => a.Block == colRef.Block && a.Col != colRef.Col).ToList();
+                                if (others.Count > 0)
+                                {
+                                    needOtherTechnique = false;
+                                    foreach (var n in others)
+                                        n.removeCandidate(candidate);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return needOtherTechnique;
         }
     }
 }
